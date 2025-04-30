@@ -75,7 +75,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Write service account key
-        run: echo "${{ secrets.YC_KEY_JSON }}" > key.json
+        run: printf '%s' "${{ secrets.YC_KEY_JSON }}" > key.json
 
       - name: Install Yandex Cloud CLI
         run: |
