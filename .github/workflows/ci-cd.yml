@@ -74,14 +74,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
           
+      - name: Write service account key
+        run: echo "${{ secrets.YC_KEY_JSON }}" > key.json
+
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
+      - name: Auth in Yandex Cloud
+        run: yc config set service-account-key key.json
+
+      - name: Login to Yandex Container Registry
+        run: yc container registry configure-docker
+
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            cr.yandex/crpqulehr82kua83ghmf/web3-comparison:latest
+            cr.yandex/crpqulehr82kua83ghmf/web3-comparison:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           
