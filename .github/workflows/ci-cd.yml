@@ -135,3 +135,9 @@ jobs:
             --concurrency 10 \
             --execution-timeout 30s \
             --service-account-id ${{ secrets.YC_SERVICE_ACCOUNT_ID }}
+
+      - name: Debug YC_KEY_JSON
+        run: |
+          echo "==START=="
+          echo "${{ secrets.YC_KEY_JSON }}"
+          echo "==END=="
