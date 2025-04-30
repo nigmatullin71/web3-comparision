@@ -73,6 +73,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Debug YC_KEY_JSON
+        run: |
+          echo "==START=="
+          echo "${{ secrets.YC_KEY_JSON }}"
+          echo "==END=="
+    
           
       - name: Write service account key
         run: printf '%s' "${{ secrets.YC_KEY_JSON }}" > key.json
@@ -136,8 +143,4 @@ jobs:
             --execution-timeout 30s \
             --service-account-id ${{ secrets.YC_SERVICE_ACCOUNT_ID }}
 
-      - name: Debug YC_KEY_JSON
-        run: |
-          echo "==START=="
-          echo "${{ secrets.YC_KEY_JSON }}"
-          echo "==END=="
+      
