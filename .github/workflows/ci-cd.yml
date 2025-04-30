@@ -73,36 +73,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Debug YC_KEY_JSON
-        run: |
-          echo "==START=="
-          echo "${{ secrets.YC_KEY_JSON }}"
-          echo "==END=="
-    
           
-      - name: Write service account key
-        run: printf '%s' "${{ secrets.YC_KEY_JSON }}" > key.json
-
-      - name: Install Yandex Cloud CLI
-        run: |
-          curl https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
-
-      - name: Auth in Yandex Cloud
-        run: yc config set service-account-key key.json
-
-      - name: Login to Yandex Container Registry
-        run: yc container registry configure-docker
-
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: |
-            cr.yandex/crpqulehr82kua83ghmf/web3-comparison:latest
-            cr.yandex/crpqulehr82kua83ghmf/web3-comparison:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           
@@ -115,32 +94,64 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
+      # Добавляем шаг для отладки
+      - name: Debug environment
+        run: |
+          echo "GitHub SHA: ${{ github.sha }}"
+          echo "GitHub Repository: ${{ github.repository }}"
+          echo "PATH: $PATH"
         
-      - name: Write service account key
-        run: echo "${{ secrets.YC_KEY_JSON }}" > key.json
-
+      # Исправленная установка Yandex Cloud CLI
       - name: Install Yandex Cloud CLI
         run: |
-          curl https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
           echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+      
+      # Используем shell для запуска следующих шагов
+      - name: Setup shell
+        run: |
+          echo "export PATH=$HOME/yandex-cloud/bin:$PATH" >> $GITHUB_ENV
+      
+      # Проверяем установку CLI
+      - name: Verify YC installation
+        run: |
+          which yc || echo "YC not found in PATH"
+          $HOME/yandex-cloud/bin/yc version
           
-      - name: Auth in Yandex Cloud
-        run: yc config set service-account-key key.json
-
+      # Создаем файл с ключом сервисного аккаунта
+      - name: Setup service account key
+        run: |
+          echo '${{ secrets.YC_KEY_JSON }}' > sa-key.json
+          
+      # Исправленная конфигурация Yandex Cloud с использованием ключа сервисного аккаунта
+      - name: Configure Yandex Cloud
+        run: |
+          $HOME/yandex-cloud/bin/yc config profile create default
+          $HOME/yandex-cloud/bin/yc config set service-account-key sa-key.json
+          $HOME/yandex-cloud/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
+          
+      # Создаем контейнер, если он не существует
       - name: Create container if not exists
         run: |
-          yc serverless container get --name web3-comparison || \
-          yc serverless container create --name web3-comparison
+          $HOME/yandex-cloud/bin/yc serverless container get --name web3-comparison || \
+          $HOME/yandex-cloud/bin/yc serverless container create --name web3-comparison
           
+      # Развертывание в Yandex Cloud Serverless Containers
       - name: Deploy to Yandex Cloud Serverless Containers
         run: |
-          yc serverless container revision deploy \
+          $HOME/yandex-cloud/bin/yc serverless container revision deploy \
             --container-name web3-comparison \
-            --image cr.yandex/crpqulehr82kua83ghmf/web3-comparison:${{ github.sha }} \
+            --image ghcr.io/${{ github.repository }}:${{ github.sha }} \
             --cores 1 \
             --memory 1GB \
             --concurrency 10 \
             --execution-timeout 30s \
-            --service-account-id ${{ secrets.YC_SERVICE_ACCOUNT_ID }}
-
-      
+            --service-account-id ${{ secrets.YC_SERVICE_ACCOUNT_ID }} \
+            --environment PORT=3000,NODE_ENV=production,APP_VERSION=${{ secrets.APP_VERSION }},DEPLOYMENT_ID=${{ github.sha }}
+            
+      # Получаем URL развернутого приложения
+      - name: Get deployment URL
+        run: |
+          echo "Deployment URL:"
+          $HOME/yandex-cloud/bin/yc serverless container get --name web3-comparison --format json | jq -r '.domain'
